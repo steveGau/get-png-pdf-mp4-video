@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+
+# Secrets and local run helpers (conda paths / credentials)
+cookies.txt
+**/cookies.txt
+*.bat
+run.txt
+
+# Media and generated extracts
+*.mp4
+*.pdf
+PNG_Example/png/*.png
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.pptx
