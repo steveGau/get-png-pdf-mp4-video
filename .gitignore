@@ -14,6 +14,8 @@ run.txt
 *.mp4
 *.pdf
 PNG_Example/png/*.png
+mp4/
+mp4_bench/
 
 # Editor / OS
 .vscode/

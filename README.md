@@ -74,8 +74,9 @@ Start Time / End Time stay in sync between Home and Extract Video.
 
 ### Extract Video
 
-- **Extract Video** — cut **Start Time** → **End Time**. Output **duration stays End − Start**. Playback speed only changes frame density (for example `0.5x` packs twice as many frames into the same length). Always writes an `_av.mp4` (video + audio). Check **Dumb Video** to also write a silent `_dumb.mp4`.
-- **Rotate Video** — applied on extract (`No Rotation`, 90/180 left or right).
+- **Extract Video** — cut **Start Time** → **End Time**. Output **duration stays End − Start**. Always writes an `_av.mp4` (video + audio). Check **Dumb Video** to also write a silent `_dumb.mp4`.
+- **No Rotation + 1.0x** — fast **stream copy** (`ffmpeg -c copy`, same approach as H_SplitMP4-GUI `Process`). Much faster than re-encoding.
+- **Rotate Video** or playback speed ≠ 1.0x — existing **re-encode** path (libx264 / filters). Rotation options: `No Rotation`, 90/180 left or right. Non-1.0x speed changes frame density only (for example `0.5x` packs twice as many frames into the same length).
 - **Clear All MP4s** — deletes files in the `mp4` folder.
 
 ### Extract PNG

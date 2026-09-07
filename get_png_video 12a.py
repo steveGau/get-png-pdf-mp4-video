@@ -1185,6 +1185,39 @@ class VideoPlayer:
         """Stream copy only when speed is 1.0x and no rotation is selected."""
         return abs(speed - 1.0) >= 1e-6 or self._get_rotate_filter() is not None
 
+    def _extract_av_stream_copy(self, start_sec, end_sec, output_av):
+        """
+        Fast extract via stream copy (same method as H_SplitMP4-GUI Process).
+        Uses input-side -ss and -c copy; cuts near keyframes (no re-encode).
+        """
+        duration_sec = max(0.0, float(end_sec) - float(start_sec))
+        cmd = [
+            "ffmpeg", "-y", "-hide_banner", "-nostdin", "-loglevel", "error",
+            "-ss", f"{float(start_sec):0.2f}",
+            "-i", self.video_path,
+            "-t", f"{duration_sec:0.2f}",
+            "-map", "0",
+            "-vcodec", "copy",
+            "-acodec", "copy",
+            output_av,
+        ]
+        return self._run_ffmpeg(cmd, "Video+audio stream copy (fast)")
+
+    def _extract_dumb_stream_copy(self, start_sec, end_sec, output_dumb):
+        """Fast silent extract via stream copy (No Rotation / 1.0x path)."""
+        duration_sec = max(0.0, float(end_sec) - float(start_sec))
+        cmd = [
+            "ffmpeg", "-y", "-hide_banner", "-nostdin", "-loglevel", "error",
+            "-ss", f"{float(start_sec):0.2f}",
+            "-i", self.video_path,
+            "-t", f"{duration_sec:0.2f}",
+            "-map", "0:v:0",
+            "-an",
+            "-vcodec", "copy",
+            output_dumb,
+        ]
+        return self._run_ffmpeg(cmd, "Dumb video stream copy (fast)")
+
     def extract_video(self):
         """
         Extract video segment between Start Time and End Time at the Playback Speed.
@@ -1192,6 +1225,9 @@ class VideoPlayer:
         frames are packed into that period (0.5x = 2x frames, 2x = half frames).
         Always outputs with-audio MP4 (_av). If Dumb Video is checked, also outputs
         a silent MP4 (_dumb).
+
+        No Rotation + 1.0x uses H_SplitMP4-style stream copy (fast).
+        Rotate Video / non-1.0x speed keep the existing re-encode path.
         """
         if self.video_path is None:
             messagebox.showwarning("Warning", "Please open a video file first.")
@@ -1254,6 +1290,53 @@ class VideoPlayer:
             messagebox.showerror("Error", "Could not convert time format for ffmpeg.")
             return
 
+        # Fast path: No Rotation + 1.0x — same as H_SplitMP4-GUI ffmpeg_extract_subclip
+        use_fast_copy = (self._get_rotate_filter() is None) and (abs(speed - 1.0) < 1e-6)
+        if use_fast_copy:
+            start_sec = start_ms / 1000.0
+            end_sec = end_ms / 1000.0
+            try:
+                self.status_var.set("Extracting video (stream copy, fast)...")
+                self.root.update()
+                ok_av, err_av = self._extract_av_stream_copy(start_sec, end_sec, output_av)
+                if not ok_av:
+                    self.status_var.set("Extract failed")
+                    messagebox.showerror("Error", f"ffmpeg failed:\n{err_av}")
+                    return
+                if dumb_video:
+                    self.status_var.set("Extracting dumb video (stream copy, fast)...")
+                    self.root.update()
+                    ok_dumb, err_dumb = self._extract_dumb_stream_copy(
+                        start_sec, end_sec, output_dumb
+                    )
+                    if not ok_dumb:
+                        self.status_var.set("Extract partial")
+                        messagebox.showwarning(
+                            "Partial Success",
+                            f"Video+audio file created:\n{os.path.basename(output_av)}\n\n"
+                            f"Dumb video failed:\n{err_dumb}",
+                        )
+                        return
+                self.status_var.set(f"Extracted: {os.path.basename(output_av)}")
+                success_msg = (
+                    f"Video extracted at {speed}x playback speed.\n"
+                    f"Rotation: {self.rotate_video_var.get().strip()}\n"
+                    f"Method: stream copy (fast)\n"
+                    f"Duration: {self.ms_to_time_hires(duration_ms)} (same as End - Start).\n\n"
+                    f"With audio: {os.path.basename(output_av)}\n"
+                )
+                if dumb_video:
+                    success_msg += f"Dumb video (no audio): {os.path.basename(output_dumb)}\n"
+                success_msg += f"\nSaved to: {mp4_folder}"
+                messagebox.showinfo("Success", success_msg)
+            except FileNotFoundError:
+                self.status_var.set("Extract failed")
+                messagebox.showerror(
+                    "Error",
+                    "ffmpeg not found. Please install ffmpeg and add it to your PATH.",
+                )
+            return
+
         vf = self._build_video_filter_chain(speed)
         if self._needs_video_reencode(speed) and not vf:
             messagebox.showerror(
@@ -1262,12 +1345,9 @@ class VideoPlayer:
             )
             return
 
-        # Always re-encode. Stream copy (`-c copy`) can only cut on keyframes.
-        # Livestream recordings often have ~4s GOPs, so a 1.0x extract snaps to
-        # the previous keyframe and marks the incomplete trailing GOP as discard
-        # — players then skip that video ("part of the video is missing").
-        # Input-side -ss + re-encode is still frame-accurate; use output-side
-        # -ss when a filter must decode every frame (rotation / speed).
+        # Rotate Video / non-1.0x: re-encode (unchanged). Stream copy cannot rotate
+        # or change frame density. Input-side -ss + re-encode is frame-accurate;
+        # use output-side -ss when a filter must decode every frame.
         trim_args = self._ffmpeg_trim_input(start_ffmpeg, duration_ffmpeg, bool(vf))
         common_input = self._ffmpeg_base() + trim_args
 
