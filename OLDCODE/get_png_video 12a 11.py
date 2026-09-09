@@ -493,9 +493,10 @@ class VideoPlayer:
         ms_per_frame = 1000 / self.fps if self.fps > 0 else 0
         self.frame_res_label.configure(text=f"[{self.fps:.2f} fps = {ms_per_frame:.2f}ms/frame]")
         
-        # Default playback speed is 1.0x
-        self.custom_speed_var.set("1.0")
-        self.set_speed(1.0)
+        # Calculate and set the lowest playback speed based on video FPS
+        lowest_speed = self.calculate_lowest_speed()
+        self.custom_speed_var.set(f"{lowest_speed}")
+        self.set_speed(lowest_speed)
         
     def update_png_counter(self):
         """Update PNG counter based on existing files."""

@@ -69,7 +69,7 @@ Start Time / End Time stay in sync between Home and Extract Video.
 
 ### Home
 
-- **Set** / speed buttons / **Playback Speed** — change VLC rate. Opening a video sets speed to a safe minimum near `1/fps` (not below `0.25x`).
+- **Set** / speed buttons / **Playback Speed** — change VLC rate. Opening a video sets the default speed to **1.0x**.
 - **Get Video Time** — append the current **Go to time** (as seconds) to `VideoTime/VideoTime.txt`. Opening a new video deletes that file.
 
 ### Extract Video
